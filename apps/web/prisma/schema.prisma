@@ -1,0 +1,106 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../app/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String      @id @default(uuid())
+  email      String      @unique
+  name       String?
+  orgMembers OrgMember[]
+  auditLogs  AuditLog[]
+
+  createdAt DateTime @default(now())
+}
+
+model Org {
+  id   String @id @default(uuid())
+  name String
+  plan String @default("free")
+
+  members   OrgMember[]
+  documents Document[]
+  createdAt DateTime    @default(now())
+  AuditLog  AuditLog[]
+}
+
+model OrgMember {
+  id     String @id @default(uuid())
+  orgId  String
+  userId String
+  role   String
+
+  createdAt DateTime @default(now())
+
+  org  Org  @relation(fields: [orgId], references: [id])
+  user User @relation(fields: [userId], references: [id])
+}
+
+model AuditLog {
+  id        String  @id @default(uuid())
+  orgId     String
+  userId    String
+  action    String
+  subjectId String?
+  metadata  Json
+
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  org  Org  @relation(fields: [orgId], references: [id])
+}
+
+model Document {
+  id         String @id @default(uuid())
+  orgId      String
+  title      String
+  storageKey String
+  bytes      BigInt
+  pageCount  Int
+
+  checksum  String
+  createdBy String
+
+  createdAt        DateTime @default(now())
+  currentVersionId String?
+
+  org      Org               @relation(fields: [orgId], references: [id])
+  versions DocumentVersion[]
+}
+
+model DocumentVersion {
+  id         String   @id @default(uuid())
+  documentId String
+  storageKey String
+  bytes      BigInt
+  pageCount  Int
+  checksum   String
+  createdBy  String
+  note       String?
+  createdAt  DateTime @default(now())
+  document   Document @relation(fields: [documentId], references: [id])
+}
+
+model Job {
+  id        String   @id @default(uuid())
+  orgId     String
+  type      String // MERGE, ...
+  status    String // QUEUED, RUNNING, DONE, ERROR
+  input     Json
+  output    Json?
+  error     String?
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
