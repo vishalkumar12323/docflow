@@ -123,3 +123,132 @@ export const authOptions: NextAuthConfig = {
     strategy: "jwt",
   },
 };
+
+export async function getCurrentUser() {
+  const { getUser } = require("@kinde-oss/kinde-auth-nextjs/server");
+
+  try {
+    const kindeUser = await getUser();
+
+    if (!kindeUser) return null;
+
+    const user = await prisma.user.findUnique({
+      where: { kindeId: kindeUser.id },
+      include: {
+        orgMembers: {
+          include: {
+            org: true,
+          },
+        },
+      },
+    });
+
+    return user;
+  } catch (error) {
+    console.error("Error getting current user:", error);
+    return null;
+  }
+}
+
+export async function requireAuth() {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    throw new Error("Authentication required");
+  }
+
+  return user;
+}
+
+export async function getUserOrganizations(userId: string) {
+  const orgMembers = await prisma.orgMember.findMany({
+    where: { userId },
+    include: {
+      org: true,
+    },
+    orderBy: {
+      org: {
+        createdAt: "asc",
+      },
+    },
+  });
+
+  return orgMembers.map((member) => ({
+    ...member.org,
+    role: member.role,
+    joinedAt: member.joinedAt,
+  }));
+}
+
+export async function checkOrgPermission(
+  userId: string,
+  orgId: string,
+  requiredRole: OrgRole[] = [
+    OrgRole.OWNER,
+    OrgRole.ADMIN,
+    OrgRole.EDITOR,
+    OrgRole.VIEWER,
+  ]
+) {
+  const member = await prisma.orgMember.findUnique({
+    where: {
+      orgId_userId: {
+        orgId,
+        userId,
+      },
+    },
+  });
+
+  if (!member) {
+    return { hasPermission: false, role: null };
+  }
+
+  const hasPermission = requiredRole.includes(member.role);
+
+  return { hasPermission, role: member.role };
+}
+
+export async function requireOrgAccess(
+  userId: string,
+  orgId: string,
+  requiredRole: OrgRole[] = [OrgRole.VIEWER]
+) {
+  const { hasPermission, role } = await checkOrgPermission(
+    userId,
+    orgId,
+    requiredRole
+  );
+
+  if (!hasPermission) {
+    throw new Error("Insufficient permissions");
+  }
+
+  return role!;
+}
+
+// Role hierarchy helper
+export function getRoleHierarchy(role: OrgRole): number {
+  const hierarchy = {
+    [OrgRole.VIEWER]: 1,
+    [OrgRole.EDITOR]: 2,
+    [OrgRole.ADMIN]: 3,
+    [OrgRole.OWNER]: 4,
+  };
+  return hierarchy[role];
+}
+
+export function hasHigherRole(userRole: OrgRole, targetRole: OrgRole): boolean {
+  return getRoleHierarchy(userRole) > getRoleHierarchy(targetRole);
+}
+
+export function canManageRole(userRole: OrgRole, targetRole: OrgRole): boolean {
+  // Owners can manage all roles
+  if (userRole === OrgRole.OWNER) return true;
+
+  // Admins can manage editors and viewers
+  if (userRole === OrgRole.ADMIN) {
+    return targetRole === OrgRole.EDITOR || targetRole === OrgRole.VIEWER;
+  }
+
+  return false;
+}
