@@ -9,20 +9,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Enums for better type safety
-enum OrgRole {
-  OWNER
-  ADMIN
-  EDITOR
-  VIEWER
-}
-
-enum OrgPlan {
-  FREE
-  PRO
-  ENTERPRISE
-}
-
 enum JobType {
   MERGE
   SPLIT
@@ -41,152 +27,68 @@ enum JobStatus {
 }
 
 model User {
-  id            String      @id @default(uuid())
-  email         String      @unique
+  id            String     @id @default(uuid())
+  email         String     @unique
   name          String?
-  avatar        String?     // Profile picture URL
-  kindeId       String      @unique // Kinde user ID
-  emailVerified Boolean     @default(false)
-  isActive      Boolean     @default(true)
+  avatar        String? // Profile picture URL
+  emailVerified Boolean    @default(false)
+  isActive      Boolean    @default(true)
   lastLoginAt   DateTime?
-  orgMembers    OrgMember[]
   auditLogs     AuditLog[]
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
 
   @@map("users")
 }
 
-model Org {
-  id          String    @id @default(uuid())
-  name        String
-  slug        String    @unique // URL-friendly identifier
-  plan        OrgPlan   @default(FREE)
-  logo        String?   // Organization logo URL
-  settings    Json      @default("{}")
-  isActive    Boolean   @default(true)
-  members     OrgMember[]
-  documents   Document[]
-  jobs        Job[]
-  auditLogs   AuditLog[]
-  invitations OrgInvitation[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  @@map("organizations")
-}
-
-model OrgMember {
-  id        String   @id @default(uuid())
-  orgId     String
-  userId    String
-  role      OrgRole
-  joinedAt  DateTime @default(now())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  org  Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([orgId, userId])
-  @@map("org_members")
-}
-
-model OrgInvitation {
-  id        String   @id @default(uuid())
-  orgId     String
-  email     String
-  role      OrgRole
-  token     String   @unique
-  invitedBy String   // User ID who sent the invitation
-  expiresAt DateTime
-  acceptedAt DateTime?
-  createdAt DateTime @default(now())
-
-  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
-
-  @@unique([orgId, email])
-  @@map("org_invitations")
-}
-
 model AuditLog {
   id         String   @id @default(uuid())
-  orgId      String
   userId     String
-  action     String   // USER_JOINED, DOCUMENT_CREATED, etc.
-  resource   String?  // Resource type (document, user, etc.)
-  resourceId String?  // ID of the affected resource
+  action     String // USER_JOINED, DOCUMENT_CREATED, etc.
+  resource   String? // Resource type (document, user, etc.)
+  resourceId String? // ID of the affected resource
   metadata   Json     @default("{}")
   ipAddress  String?
   userAgent  String?
   createdAt  DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  org  Org  @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@map("audit_logs")
 }
 
 model Document {
-  id               String            @id @default(uuid())
-  orgId            String
+  id               String    @id @default(uuid())
   title            String
-  originalFileName String            // Original uploaded filename
-  storageKey       String            // Cloudinary public ID or file path
-  storageUrl       String            // Direct URL to the file
-  thumbnailUrl     String?           // Thumbnail image URL
-  mimeType         String            @default("application/pdf")
+  originalFileName String // Original uploaded filename
+  storageKey       String // Cloudinary public ID or file path
+  storageUrl       String // Direct URL to the file
+  thumbnailUrl     String? // Thumbnail image URL
+  mimeType         String    @default("application/pdf")
   bytes            BigInt
   pageCount        Int
-  checksum         String            // File integrity check
-  createdBy        String            // User ID
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  currentVersionId String?
-  isDeleted        Boolean           @default(false)
+  createdBy        String // User ID
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  isDeleted        Boolean   @default(false)
   deletedAt        DateTime?
-
-  org      Org               @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  versions DocumentVersion[]
 
   @@map("documents")
 }
 
-model DocumentVersion {
-  id         String   @id @default(uuid())
-  documentId String
-  version    Int      // Version number (1, 2, 3, etc.)
-  storageKey String
-  storageUrl String
-  bytes      BigInt
-  pageCount  Int
-  checksum   String
-  createdBy  String   // User ID
-  note       String?  // Version notes
-  createdAt  DateTime @default(now())
-
-  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
-
-  @@unique([documentId, version])
-  @@map("document_versions")
-}
-
 model Job {
   id          String    @id @default(uuid())
-  orgId       String
   type        JobType
   status      JobStatus @default(QUEUED)
-  input       Json      // Job input parameters
-  output      Json?     // Job output/results
+  input       Json // Job input parameters
+  output      Json? // Job output/results
   progress    Int       @default(0) // 0-100
-  error       String?   // Error message if failed
+  error       String? // Error message if failed
   startedAt   DateTime?
   completedAt DateTime?
-  createdBy   String    // User ID
+  createdBy   String // User ID
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
-
-  org Org @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@map("jobs")
 }
