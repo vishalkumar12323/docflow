@@ -1,11 +1,11 @@
 "use client";
 import React, { useState } from "react";
-import { Eye, EyeOff, Mail, Lock, User, Loader2 } from "lucide-react";
-import { signUp } from "@/actions/actions.auth";
+import { Eye, EyeOff, Mail, Lock, Loader2 } from "lucide-react";
 import { signIn } from "next-auth/react";
 import { CredentialsSignin } from "next-auth";
 import { useRouter } from "next/navigation";
 import z from "zod";
+import Link from "next/link";
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address" }),
@@ -14,30 +14,13 @@ const loginSchema = z.object({
     .min(6, { message: "Password must be at least 6 characters" }),
 });
 
-const signupSchema = z
-  .object({
-    name: z.string().min(2, { message: "Name must be at least 2 characters" }),
-    email: z.string().email({ message: "Invalid email address" }),
-    password: z
-      .string()
-      .min(6, { message: "Password must be at least 6 characters" }),
-    confirmPassword: z.string(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: "Passwords do not match",
-    path: ["confirmPassword"],
-  });
-
-export default function AuthPage() {
-  const [isLogin, setIsLogin] = useState(true);
+export default function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [loginError, setLoginError] = useState("");
   const [formData, setFormData] = useState({
-    name: "",
     email: "",
     password: "",
-    confirmPassword: "",
   });
   const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
 
@@ -55,13 +38,7 @@ export default function AuthPage() {
     setIsLoading(true);
     setLoginError("");
     setFormErrors({});
-
-    let validationResult;
-    if (isLogin) {
-      validationResult = loginSchema.safeParse(formData);
-    } else {
-      validationResult = signupSchema.safeParse(formData);
-    }
+    const validationResult = loginSchema.safeParse(formData);
 
     if (!validationResult.success) {
       // Collect errors
@@ -77,15 +54,6 @@ export default function AuthPage() {
     const formDataObj = new FormData(e.currentTarget);
 
     try {
-      if (!isLogin) {
-        const signupResult = await signUp(formDataObj);
-        if (signupResult?.error) {
-          setLoginError(signupResult.error);
-          setIsLoading(false);
-          return;
-        }
-      }
-
       const result = await signIn("credentials", {
         email: formDataObj.get("email"),
         password: formDataObj.get("password"),
@@ -109,16 +77,6 @@ export default function AuthPage() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const toggleMode = () => {
-    setIsLogin(!isLogin);
-    setFormData({
-      name: "",
-      email: "",
-      password: "",
-      confirmPassword: "",
-    });
   };
 
   return (
@@ -154,41 +112,15 @@ export default function AuthPage() {
             <div className="relative z-10">
               <div className="text-center mb-8">
                 <h1 className="text-3xl font-bold text-white mb-2">
-                  {isLogin ? "Welcome Back" : "Create Account"}
+                  Welcome Back
                 </h1>
                 <p className="text-gray-400">
-                  {isLogin
-                    ? "Sign in to your account to continue"
-                    : "Join us and start your journey today"}
+                  Sign in to your account to continue
                 </p>
               </div>
 
               {/* Form */}
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Name Field (Signup only) */}
-                {!isLogin && (
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-300">
-                      Full Name
-                    </label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                      <input
-                        type="text"
-                        name="name"
-                        value={formData.name}
-                        onChange={handleInputChange}
-                        className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-sky-500/50 focus:shadow-lg focus:shadow-sky-500/20 transition-all duration-300 backdrop-blur-sm"
-                        placeholder="Enter your full name"
-                        required={!isLogin}
-                      />
-                    </div>
-                    {formErrors.name && (
-                      <p className="text-red-500 text-sm">{formErrors.name}</p>
-                    )}
-                  </div>
-                )}
-
                 {/* Email Field */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-gray-300">
@@ -248,43 +180,16 @@ export default function AuthPage() {
                 <div className="space-y-1">
                   <p className="text-red-500 text-sm">{loginError}</p>
                 </div>
-                {/* Confirm Password (Signup only) */}
-                {!isLogin && (
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-300">
-                      Confirm Password
-                    </label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                      <input
-                        type="password"
-                        name="confirmPassword"
-                        value={formData.confirmPassword}
-                        onChange={handleInputChange}
-                        className="w-full pl-12 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-sky-500/50 focus:shadow-lg focus:shadow-sky-500/20 transition-all duration-300 backdrop-blur-sm"
-                        placeholder="Confirm your password"
-                        required={!isLogin}
-                      />
-                    </div>
-                    {formErrors.confirmPassword && (
-                      <p className="text-red-500 text-sm">
-                        {formErrors.confirmPassword}
-                      </p>
-                    )}
-                  </div>
-                )}
 
                 {/* Forgot Password (Login only) */}
-                {isLogin && (
-                  <div className="text-right">
-                    <button
-                      type="button"
-                      className="text-sm text-gray-400 hover:text-white transition-colors"
-                    >
-                      Forgot password?
-                    </button>
-                  </div>
-                )}
+                <div className="text-right">
+                  <button
+                    type="button"
+                    className="text-sm text-gray-400 hover:text-white transition-colors"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
 
                 {/* Submit Button */}
                 <button
@@ -295,12 +200,10 @@ export default function AuthPage() {
                   {isLoading ? (
                     <>
                       <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                      {isLogin ? "Signing In..." : "Creating Account..."}
+                      Signing In...
                     </>
-                  ) : isLogin ? (
-                    "Sign In"
                   ) : (
-                    "Create Account"
+                    <span>Sign In</span>
                   )}
                 </button>
 
@@ -365,16 +268,13 @@ export default function AuthPage() {
               {/* Toggle Mode */}
               <div className="text-center mt-6">
                 <p className="text-gray-400">
-                  {isLogin
-                    ? "Don't have an account?"
-                    : "Already have an account?"}
-                  <button
-                    type="button"
-                    onClick={toggleMode}
+                  Don't have an account?
+                  <Link
+                    href={"/signup"}
                     className="ml-2 text-white font-semibold hover:text-teal-400 transition-colors cursor-pointer"
                   >
-                    {isLogin ? "Sign Up" : "Sign In"}
-                  </button>
+                    Sign Up
+                  </Link>
                 </p>
               </div>
             </div>

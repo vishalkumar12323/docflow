@@ -1,6 +1,5 @@
 "use server";
 import { prisma } from "@/database/prisma";
-import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import z from "zod";
 
@@ -31,7 +30,7 @@ export async function signUp(formData: any) {
   });
 
   if (existingUser) {
-    return { error: "Email is already registered." };
+    return { message: "USER_EXIST", error: "Email is already registered." };
   }
 
   // Hash password (using bcryptjs)
@@ -46,9 +45,11 @@ export async function signUp(formData: any) {
         password: hashedPassword,
       },
     });
-    // Redirect to login page
-    redirect("/login");
+    return { message: "success", error: null };
   } catch (error) {
-    return { error: "Failed to create user. Please try again." };
+    return {
+      message: "Unknow",
+      error: "Failed to create user. Please try again.",
+    };
   }
 }
