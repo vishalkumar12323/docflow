@@ -2,13 +2,27 @@
 import { prisma } from "@/database/prisma";
 import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
+import z from "zod";
 
+const signupSchema = z.object({
+  name: z.string().min(2, { message: "Name must be at least 2 characters" }),
+  email: z.string().email({ message: "Invalid email address" }),
+  password: z
+    .string()
+    .min(6, { message: "Password must be at least 6 characters" }),
+});
 export async function signUp(formData: any) {
-  const { fullName, email, password } = formData;
+  const fullName = formData.get("name");
+  const email = formData.get("email");
+  const password = formData.get("password");
 
-  // Basic validation
-  if (!fullName || !email || !password) {
-    return { error: "All fields are required." };
+  const validation = signupSchema.safeParse({
+    name: fullName,
+    email,
+    password,
+  });
+  if (!validation.success) {
+    return { error: validation.error.issues[0].message };
   }
 
   // Check if user already exists

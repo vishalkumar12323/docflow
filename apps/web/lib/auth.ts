@@ -3,13 +3,9 @@ import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import GitHub from "next-auth/providers/github";
 import { prisma } from "@/database/prisma";
+import bcrypt from "bcryptjs";
 
-export const {
-  handlers: { GET, POST },
-  auth,
-  signIn,
-  signOut,
-} = NextAuth({
+export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     Credentials({
       name: "credential",
@@ -26,7 +22,9 @@ export const {
 
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user) return null;
-        return user;
+        const isPasswordMatch = await bcrypt.compare(password, user.password);
+        if (isPasswordMatch) return user;
+        return null;
       },
     }),
     Google({
@@ -52,9 +50,8 @@ export const {
     },
   },
   pages: {
-    signIn: "/auth/login",
-    signOut: "/auth/logout",
-    error: "/auth/error",
+    signIn: "/login",
+    error: "/error",
   },
   session: {
     strategy: "jwt",

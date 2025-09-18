@@ -1,33 +1,114 @@
 "use client";
 import React, { useState } from "react";
 import { Eye, EyeOff, Mail, Lock, User, Loader2 } from "lucide-react";
+import { signUp } from "@/actions/actions.auth";
+import { signIn } from "next-auth/react";
+import { CredentialsSignin } from "next-auth";
+import { useRouter } from "next/navigation";
+import z from "zod";
+
+const loginSchema = z.object({
+  email: z.string().email({ message: "Invalid email address" }),
+  password: z
+    .string()
+    .min(6, { message: "Password must be at least 6 characters" }),
+});
+
+const signupSchema = z
+  .object({
+    name: z.string().min(2, { message: "Name must be at least 2 characters" }),
+    email: z.string().email({ message: "Invalid email address" }),
+    password: z
+      .string()
+      .min(6, { message: "Password must be at least 6 characters" }),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
 
 export default function AuthPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [loginError, setLoginError] = useState("");
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
     confirmPassword: "",
   });
+  const [formErrors, setFormErrors] = useState<{ [key: string]: string }>({});
 
-  const handleInputChange = (e) => {
+  const router = useRouter();
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value,
+      [name]: value,
     });
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
+    setLoginError("");
+    setFormErrors({});
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    let validationResult;
+    if (isLogin) {
+      validationResult = loginSchema.safeParse(formData);
+    } else {
+      validationResult = signupSchema.safeParse(formData);
+    }
 
-    setIsLoading(false);
+    if (!validationResult.success) {
+      // Collect errors
+      const errors: { [key: string]: string } = {};
+      validationResult.error.issues.forEach((err) => {
+        if (err.path[0]) errors[String(err.path[0])] = err.message;
+      });
+      setFormErrors(errors);
+      setIsLoading(false);
+      return;
+    }
+
+    const formDataObj = new FormData(e.currentTarget);
+
+    try {
+      if (!isLogin) {
+        const signupResult = await signUp(formDataObj);
+        if (signupResult?.error) {
+          setLoginError(signupResult.error);
+          setIsLoading(false);
+          return;
+        }
+      }
+
+      const result = await signIn("credentials", {
+        email: formDataObj.get("email"),
+        password: formDataObj.get("password"),
+        redirect: false,
+      });
+
+      if (result?.error) {
+        if (result.error === CredentialsSignin.name) {
+          setLoginError("Invalid credential, try again");
+        } else {
+          setLoginError(result.error);
+        }
+      }
+      if (result.ok && !result.error) {
+        router.push("/dashboard");
+        router.refresh();
+      }
+    } catch (error) {
+      console.error("Auth error:", error);
+      setLoginError(`An unexpected error occurred, try again`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const toggleMode = () => {
@@ -83,7 +164,7 @@ export default function AuthPage() {
               </div>
 
               {/* Form */}
-              <div className="space-y-6">
+              <form onSubmit={handleSubmit} className="space-y-6">
                 {/* Name Field (Signup only) */}
                 {!isLogin && (
                   <div className="space-y-2">
@@ -102,6 +183,9 @@ export default function AuthPage() {
                         required={!isLogin}
                       />
                     </div>
+                    {formErrors.name && (
+                      <p className="text-red-500 text-sm">{formErrors.name}</p>
+                    )}
                   </div>
                 )}
 
@@ -122,6 +206,9 @@ export default function AuthPage() {
                       required
                     />
                   </div>
+                  {formErrors.email && (
+                    <p className="text-red-500 text-sm">{formErrors.email}</p>
+                  )}
                 </div>
 
                 {/* Password Field */}
@@ -152,8 +239,15 @@ export default function AuthPage() {
                       )}
                     </button>
                   </div>
+                  {formErrors.password && (
+                    <p className="text-red-500 text-sm">
+                      {formErrors.password}
+                    </p>
+                  )}
                 </div>
-
+                <div className="space-y-1">
+                  <p className="text-red-500 text-sm">{loginError}</p>
+                </div>
                 {/* Confirm Password (Signup only) */}
                 {!isLogin && (
                   <div className="space-y-2">
@@ -172,6 +266,11 @@ export default function AuthPage() {
                         required={!isLogin}
                       />
                     </div>
+                    {formErrors.confirmPassword && (
+                      <p className="text-red-500 text-sm">
+                        {formErrors.confirmPassword}
+                      </p>
+                    )}
                   </div>
                 )}
 
@@ -189,8 +288,7 @@ export default function AuthPage() {
 
                 {/* Submit Button */}
                 <button
-                  type="button"
-                  onClick={handleSubmit}
+                  type="submit"
                   disabled={isLoading}
                   className="w-full py-3 px-6 bg-gradient-to-r from-sky-500 via-teal-600 to-sky-600 text-white font-semibold rounded-xl hover:from-sky-500 hover:via-blue-500 hover:to-sky-400 transition-all duration-300 transform hover:scale-[1.01] hover:shadow-xl hover:shadow-teal-500/10 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center cursor-pointer"
                 >
@@ -262,7 +360,7 @@ export default function AuthPage() {
                     Twitter
                   </button>
                 </div>
-              </div>
+              </form>
 
               {/* Toggle Mode */}
               <div className="text-center mt-6">
