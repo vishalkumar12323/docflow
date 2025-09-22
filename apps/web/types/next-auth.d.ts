@@ -8,7 +8,7 @@ declare module "next-auth" {
       id: string;
       email: string;
       name: string;
-      isVerified: boolean;
+      emailVerified: boolean;
       isActive?: boolean;
       lastLoginAt?: Date;
     };

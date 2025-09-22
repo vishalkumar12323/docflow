@@ -48,7 +48,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    async signIn({ user, account, profile }) {
+    async signIn({ user, account }) {
+      try {
+        const existingUser = await prisma.user.findUnique({
+          where: { email: user.email },
+        });
+
+        if (existingUser) {
+          await prisma.user.update({
+            where: { id: existingUser.id },
+            data: {
+              lastLoginAt: new Date(),
+            },
+          });
+          return true;
+        }
+      } catch (error) {
+        console.log("signIn callback:: ", error);
+      }
       return true;
     },
     async jwt({ token, user }) {
@@ -56,17 +73,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         token.id = user.id;
         token.picture = user?.avatar;
         token.isActive = user.isActive;
-        token.lastLoginAt = user.lastLoginAt;
+        token.lastLoginAt = user.lastLoginAt as Date;
+        token.emailVerified = user.emailVerified as boolean;
       }
       return token;
     },
     async session({ session, token }) {
-      console.log({ token });
       if (token) {
         session.userId = token.id as string;
         session.user.image = token.picture as string;
         session.user.lastLoginAt = token.lastLoginAt as Date;
         session.user.isActive = token.isActive as boolean;
+        session.user.emailVerified = token.emailVerified as any;
       }
       return session;
     },
