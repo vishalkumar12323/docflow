@@ -1,5 +1,3 @@
-// Enhanced schema.prisma with missing properties and enums
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,97 +7,144 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum JobType {
-  MERGE
-  SPLIT
-  CONVERT
-  COMPRESS
-  ROTATE
-  WATERMARK
+enum AuthProvider {
+  email
+  google
 }
 
-enum JobStatus {
-  QUEUED
-  RUNNING
-  COMPLETED
-  FAILED
-  CANCELLED
+enum UserRole {
+  user
+  admin
+}
+
+enum OperationType {
+  upload
+  edit
+  split
+  merge
+}
+
+enum OperationStatus {
+  pending
+  processing
+  completed
+  failed
 }
 
 model User {
-  id            String     @id @default(uuid())
-  email         String     @unique
-  name          String?
-  avatar        String? // Profile picture URL
-  password      String
-  emailVerified Boolean    @default(false)
-  isActive      Boolean    @default(true)
-  lastLoginAt   DateTime?
-  auditLogs     AuditLog[]
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  id                String       @id @default(uuid()) @db.Uuid
+  email             String       @unique @db.VarChar(255)
+  passwordHash      String?      @map("password_hash") @db.VarChar(255)
+  fullName          String       @map("full_name") @db.VarChar(255)
+  authProvider      AuthProvider @default(email) @map("auth_provider")
+  googleId          String?      @unique @map("google_id") @db.VarChar(255)
+  profilePictureUrl String?      @map("profile_picture_url") @db.Text
+  role              UserRole     @default(user)
+  isVerified        Boolean      @default(false) @map("is_verified")
+  storageUsed       BigInt       @default(0) @map("storage_used")
+  storageLimit      BigInt       @default(5368709120) @map("storage_limit") // 5GB default
+  createdAt         DateTime     @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt         DateTime     @updatedAt @map("updated_at") @db.Timestamp(6)
+  lastLogin         DateTime?    @map("last_login") @db.Timestamp(6)
 
+  // Relations
+  pdfFiles      PDFFile[]
+  pdfOperations PDFOperation[]
+  refreshTokens RefreshToken[]
+  activityLogs  ActivityLog[]
+
+  @@index([email])
+  @@index([googleId])
   @@map("users")
 }
 
-model AuditLog {
-  id         String   @id @default(uuid())
-  userId     String
-  action     String // USER_JOINED, DOCUMENT_CREATED, etc.
-  resource   String? // Resource type (document, user, etc.)
-  resourceId String? // ID of the affected resource
-  metadata   Json     @default("{}")
-  ipAddress  String?
-  userAgent  String?
-  createdAt  DateTime @default(now())
+model PDFFile {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  fileName         String    @map("file_name") @db.VarChar(255)
+  originalFileName String    @map("original_file_name") @db.VarChar(255)
+  fileSize         BigInt    @map("file_size")
+  filePath         String    @map("file_path") @db.Text
+  thumbnailPath    String?   @map("thumbnail_path") @db.Text
+  pageCount        Int       @map("page_count")
+  mimeType         String    @default("application/pdf") @map("mime_type") @db.VarChar(100)
+  isPublic         Boolean   @default(false) @map("is_public")
+  shareToken       String?   @unique @map("share_token") @db.VarChar(255)
+  version          Int       @default(1)
+  parentFileId     String?   @map("parent_file_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamp(6)
+  deletedAt        DateTime? @map("deleted_at") @db.Timestamp(6)
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Relations
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parentFile       PDFFile?       @relation("FileVersions", fields: [parentFileId], references: [id])
+  childFiles       PDFFile[]      @relation("FileVersions")
+  sourceOperations PDFOperation[] @relation("SourceFiles")
+  resultOperations PDFOperation[] @relation("ResultFile")
 
-  @@map("audit_logs")
+  @@index([userId])
+  @@index([shareToken])
+  @@index([deletedAt])
+  @@map("pdf_files")
 }
 
-model Document {
-  id               String    @id @default(uuid())
-  title            String
-  originalFileName String // Original uploaded filename
-  storageKey       String // Cloudinary public ID or file path
-  storageUrl       String // Direct URL to the file
-  thumbnailUrl     String? // Thumbnail image URL
-  mimeType         String    @default("application/pdf")
-  bytes            BigInt
-  pageCount        Int
-  createdBy        String // User ID
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  isDeleted        Boolean   @default(false)
-  deletedAt        DateTime?
+model PDFOperation {
+  id               String          @id @default(uuid()) @db.Uuid
+  userId           String          @map("user_id") @db.Uuid
+  operationType    OperationType   @map("operation_type")
+  sourceFileIds    String[]        @map("source_file_ids") @db.Uuid
+  resultFileId     String?         @map("result_file_id") @db.Uuid
+  operationDetails Json?           @map("operation_details") @db.JsonB
+  status           OperationStatus @default(pending)
+  errorMessage     String?         @map("error_message") @db.Text
+  createdAt        DateTime        @default(now()) @map("created_at") @db.Timestamp(6)
+  completedAt      DateTime?       @map("completed_at") @db.Timestamp(6)
 
-  @@map("documents")
+  // Relations
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resultFile  PDFFile?  @relation("ResultFile", fields: [resultFileId], references: [id], onDelete: SetNull)
+  sourceFiles PDFFile[] @relation("SourceFiles")
+
+  @@index([userId])
+  @@index([status])
+  @@map("pdf_operations")
 }
 
-model Job {
-  id          String    @id @default(uuid())
-  type        JobType
-  status      JobStatus @default(QUEUED)
-  input       Json // Job input parameters
-  output      Json? // Job output/results
-  progress    Int       @default(0) // 0-100
-  error       String? // Error message if failed
-  startedAt   DateTime?
-  completedAt DateTime?
-  createdBy   String // User ID
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+model RefreshToken {
+  id              String    @id @default(uuid()) @db.Uuid
+  userId          String    @map("user_id") @db.Uuid
+  tokenHash       String    @unique @map("token_hash") @db.VarChar(255)
+  expiresAt       DateTime  @map("expires_at") @db.Timestamp(6)
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamp(6)
+  revokedAt       DateTime? @map("revoked_at") @db.Timestamp(6)
+  replacedByToken String?   @map("replaced_by_token") @db.Uuid
 
-  @@map("jobs")
+  // Relations
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replacedBy   RefreshToken?  @relation("TokenReplacement", fields: [replacedByToken], references: [id])
+  replacements RefreshToken[] @relation("TokenReplacement")
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("refresh_tokens")
 }
 
-model Session {
-  id        String   @id @default(uuid())
-  userId    String
-  token     String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
+model ActivityLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String?  @map("user_id") @db.Uuid
+  action       String   @db.VarChar(100)
+  resourceType String?  @map("resource_type") @db.VarChar(50)
+  resourceId   String?  @map("resource_id") @db.Uuid
+  ipAddress    String?  @map("ip_address") @db.Inet
+  userAgent    String?  @map("user_agent") @db.Text
+  metadata     Json?    @db.JsonB
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamp(6)
 
-  @@map("sessions")
+  // Relations
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("activity_logs")
 }
