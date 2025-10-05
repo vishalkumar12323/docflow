@@ -7,21 +7,20 @@ declare module "next-auth" {
       role: string;
       id: string;
       email: string;
-      name: string;
-      emailVerified: boolean;
-      isActive?: boolean;
-      lastLoginAt?: Date;
+      fullName: string;
+      isVerified: boolean;
+      lastLogin?: Date;
     };
   }
 
   interface User {
     id: string;
     email: string;
-    name: string;
-    avatar?: string;
-    emailVerified?: boolean;
-    isActive?: boolean;
-    lastLoginAt?: Date;
+    fullName: string;
+    profilePictureUrl?: string;
+    isVerified?: boolean;
+    lastLogin?: Date;
+    googleId?: string;
   }
 }
 

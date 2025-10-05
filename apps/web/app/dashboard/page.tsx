@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth";
+import { auth } from "@/auth";
 import LogoutButton from "@/components/logout-button";
 
 export default async function DashboardPage() {

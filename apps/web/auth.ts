@@ -13,7 +13,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
       },
-      //@ts-ignore
+      // @ts-ignore
       async authorize(credentials) {
         const { email, password } = credentials as {
           email: string;
@@ -23,16 +23,26 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const user = await prisma.user.findUnique({ where: { email } });
         if (!user) return null;
-        const isPasswordMatch = await bcrypt.compare(password, user.password);
-        if (isPasswordMatch) return user;
+        const isPasswordMatch = await bcrypt.compare(
+          password,
+          user.passwordHash as string
+        );
+        if (isPasswordMatch)
+          return {
+            id: user.id,
+            email: user.email,
+            fullName: user.fullName,
+            profilePictureUrl: user.profilePictureUrl,
+            isVerified: user.isVerified,
+            lastLogin: user.lastLogin,
+          };
         return {
           id: user.id,
           email: user.email,
-          name: user.name,
-          avatar: user.avatar,
-          emailVerified: user.emailVerified,
-          isActive: user.isActive,
-          lastLoginAt: user.lastLoginAt,
+          fullName: user.fullName,
+          profilePictureUrl: user.profilePictureUrl,
+          isVerified: user.isVerified,
+          lastLogin: user.lastLogin,
         };
       },
     }),
@@ -58,7 +68,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           await prisma.user.update({
             where: { id: existingUser.id },
             data: {
-              lastLoginAt: new Date(),
+              lastLogin: new Date(),
             },
           });
           return true;
@@ -71,10 +81,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
-        token.picture = user?.avatar;
-        token.isActive = user.isActive;
-        token.lastLoginAt = user.lastLoginAt as Date;
-        token.emailVerified = user.emailVerified as boolean;
+        token.picture = user?.profilePictureUrl;
+        token.lastLoginAt = user.lastLogin as Date;
+        token.emailVerified = user.isVerified as boolean;
       }
       return token;
     },
@@ -82,9 +91,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (token) {
         session.userId = token.id as string;
         session.user.image = token.picture as string;
-        session.user.lastLoginAt = token.lastLoginAt as Date;
-        session.user.isActive = token.isActive as boolean;
-        session.user.emailVerified = token.emailVerified as any;
+        session.user.lastLogin = token.lastLoginAt as Date;
+        session.user.isVerified = token.isVerified as any;
       }
       return session;
     },

@@ -41,9 +41,9 @@ export async function signUp(formData: any) {
   try {
     await prisma.user.create({
       data: {
-        name: fullName,
+        fullName: fullName,
         email,
-        password: hashedPassword,
+        passwordHash: hashedPassword,
       },
     });
     return { message: "success", error: null };
