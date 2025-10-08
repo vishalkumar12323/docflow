@@ -1,8 +1,8 @@
 "use server";
-import { prisma } from "@/database/prisma";
-import bcrypt from "bcryptjs";
 import z from "zod";
+import { AuthService } from "@/services/auth-service";
 
+const authService = new AuthService();
 const signupSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters" }),
   email: z.string().email({ message: "Invalid email address" }),
@@ -26,26 +26,23 @@ export async function signUp(formData: any) {
   }
 
   // Check if user already exists
-  const existingUser = await prisma.user.findUnique({
-    where: { email },
-  });
+  const user = await authService.userByEmail(email);
 
-  if (existingUser) {
+  if (user) {
     return { message: "USER_EXIST", error: "Email is already registered." };
   }
 
-  // Hash password (using bcryptjs)
-  const hashedPassword = await bcrypt.hash(password, 10);
-
   // Create user
   try {
-    await prisma.user.create({
-      data: {
-        fullName: fullName,
-        email,
-        passwordHash: hashedPassword,
-      },
-    });
+    const data = {
+      email,
+      password,
+      full_name: fullName,
+      google_id: "",
+      profile_picture_url: "",
+      auth_provider: "email",
+    };
+    await authService.register(data);
     return { message: "success", error: null };
   } catch (error) {
     return {

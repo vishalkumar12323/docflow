@@ -7,25 +7,25 @@ declare module "next-auth" {
       role: string;
       id: string;
       email: string;
-      fullName: string;
-      isVerified: boolean;
-      lastLogin?: Date;
+      full_name: string;
+      is_verified: boolean;
+      last_login?: Date;
     };
   }
 
   interface User {
     id: string;
     email: string;
-    fullName: string;
-    profilePictureUrl?: string;
-    isVerified?: boolean;
-    lastLogin?: Date;
-    googleId?: string;
+    full_name: string;
+    profile_picture_url?: string;
+    is_verified?: boolean;
+    last_login?: Date;
+    google_id?: string;
   }
 }
 
 declare module "next-auth/jwt" {
   interface JWT {
-    emailVerified?: boolean;
+    is_verified?: boolean;
   }
 }
