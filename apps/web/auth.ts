@@ -23,7 +23,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         if (!email || !password) return null;
 
         const user = await authService.login({ email, password });
-        console.log("user:: ", user);
         if (!user) return null;
         const isPasswordMatch = await bcrypt.compare(
           password,
@@ -33,19 +32,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return {
             id: user.id,
             email: user.email,
-            fullName: user.full_name,
-            profilePictureUrl: user.profile_picture_url,
-            isVerified: user.is_verified,
-            lastLogin: user.last_login,
+            full_name: user.full_name,
+            profile_picture_url: user.profile_picture_url,
+            is_verified: user.is_verified,
+            last_login: user.last_login,
           };
-        return {
-          id: user.id,
-          email: user.email,
-          fullName: user.full_name,
-          profilePictureUrl: user.profile_picture_url,
-          isVerified: user.is_verified,
-          lastLogin: user.last_login,
-        };
+        return null;
       },
     }),
     Google({
@@ -60,7 +52,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     }),
   ],
   callbacks: {
-    async signIn({ user, account }) {
+    async signIn({ user }) {
       try {
         const existingUser = await authService.userById(user.id);
         if (existingUser) {
@@ -75,6 +67,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
+        token.full_name = user.full_name;
+        token.email = user.email;
         token.profile_picture_url = user?.profile_picture_url;
         token.last_login = user.last_login as Date;
         token.is_verified = user.is_verified as boolean;
@@ -83,10 +77,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
     async session({ session, token }) {
       if (token) {
+        session.user = {
+          id: token.id as string,
+          full_name: token.full_name as string,
+          email: token.email as string,
+          profile_picture_url: token.profile_picture_url as string,
+          last_login: token.last_login as Date,
+          is_verified: token.is_verified as boolean,
+          // emailVerified: null,
+          // image: token.profile_picture_url as string,
+        };
         session.userId = token.id as string;
-        session.user.profile_picture_url = token.profile_picture_url as string;
-        session.user.last_login = token.last_login as Date;
-        session.user.is_verified = token.is_verified as any;
       }
       return session;
     },

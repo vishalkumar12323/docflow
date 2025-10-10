@@ -10,6 +10,10 @@ export class UserRepository {
     });
   }
 
+  private toSnakeCase(str: string): string {
+    return str.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`);
+  }
+
   async create(data: Partial<UserEntity>): Promise<UserEntity> {
     const query = `
       INSERT INTO users (
