@@ -1,12 +1,29 @@
 "use client";
 
 import * as React from "react";
-import { FileUploader, FileList } from "@/components/features/file-uploader";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { mergePdfs, downloadPdf } from "@/lib/pdf-utils";
 import { ArrowLeft, Loader2, Merge } from "lucide-react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
+
+const FileUploader = dynamic(
+  () =>
+    import("@/components/features/file-uploader").then(
+      (mod) => mod.FileUploader
+    ),
+  { ssr: false }
+);
+
+const FileList = dynamic(
+  () =>
+    import("@/components/features/file-uploader").then((mod) => mod.FileList),
+  { ssr: false }
+);
+
+const importPdfUtils = async () => {
+  return import("@/lib/pdf-utils");
+};
 
 export default function MergePage() {
   const [files, setFiles] = React.useState<File[]>([]);
@@ -28,6 +45,7 @@ export default function MergePage() {
 
     setIsMerging(true);
     try {
+      const { mergePdfs, downloadPdf } = await importPdfUtils();
       const mergedPdfBytes = await mergePdfs(files);
       downloadPdf(mergedPdfBytes, "merged-document.pdf");
     } catch (error) {
