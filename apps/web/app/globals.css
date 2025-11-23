@@ -1,23 +1,14 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #ffffff;
-    --foreground: #000000;
+@layer components {
+  .primary-background {
+    @apply bg-[#12181c]
   }
-}
 
-body {
-  background: var(--background);
-  color: var(--foreground);
+  .primary-foreground {
+    @apply text-[#ffffff]
+  }
+  
+
 }
