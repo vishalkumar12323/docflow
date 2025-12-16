@@ -1,14 +1,1 @@
 @import "tailwindcss";
-
-
-@layer components {
-  .primary-background {
-    @apply bg-[#12181c]
-  }
-
-  .primary-foreground {
-    @apply text-[#ffffff]
-  }
-  
-
-}
